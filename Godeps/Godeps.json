@@ -1,0 +1,14 @@
+{
+	"ImportPath": "github.com/jonathonmg/zippy",
+	"GoVersion": "go1.8.3",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/ant0ine/go-json-rest/rest",
+			"Comment": "v3.3.2",
+			"Rev": "ce4b71cdf7ba29ef443d704bd923f5bbf281ee30"
+		}
+	]
+}
