@@ -1,9 +1,6 @@
 BIN_DIR=bin
 
-
-default: all
-
-all: zippy
+default: zippy
 
 zippy: clean
 	mkdir -p $(BIN_DIR)
@@ -12,3 +9,14 @@ zippy: clean
 
 clean:
 	rm -rf $(BIN_DIR)/*
+
+test: start_zippy
+	cd apps && godep go test
+	@cd ..
+	pkill -9 zippy || true
+
+start_zippy: stop_zippy zippy
+	pgrep zippy > /dev/null || (./bin/zippy > zippy.log 2>&1 &)
+
+stop_zippy:
+	pkill -9 zippy || true

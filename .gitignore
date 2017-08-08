@@ -6,3 +6,7 @@
 # Folders
 _main 
 bin
+
+# test files
+zippy.log
+zipfiles/

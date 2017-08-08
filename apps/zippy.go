@@ -4,19 +4,20 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/base64"
+	"flag"
 	"github.com/ant0ine/go-json-rest/rest"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 )
 
-func scanfile(res http.ResponseWriter, req *http.Request) {
-
-}
-
 func main() {
+
+	portPtr := flag.String("port", "12345", "valid tcp port")
+	flag.Parse()
+
+	log.Println("Starting server on port " + *portPtr)
 
 	restApi := rest.NewApi()
 	restApi.Use(rest.DefaultDevStack...)
@@ -28,7 +29,7 @@ func main() {
 		return
 	}
 	restApi.SetApp(router)
-	log.Fatal(http.ListenAndServe(":12345", restApi.MakeHandler()))
+	log.Fatal(http.ListenAndServe(":"+*portPtr, restApi.MakeHandler()))
 }
 
 type Payload struct {
@@ -42,75 +43,66 @@ type ReturnData struct {
 	Result   bool   `json:"result"`
 }
 
-func ScanFile(w rest.ResponseWriter, r *rest.Request) {
+func ScanFile(responseWriter rest.ResponseWriter, r *rest.Request) {
 	//filename := r.PathParam("filename")
 
 	payload := Payload{}
 	err := r.DecodeJsonPayload(&payload)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		rest.Error(responseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if payload.Filename == "" {
-		rest.Error(w, "filename required", 400)
+		rest.Error(responseWriter, "filename required", 400)
 		return
 	}
 	if payload.Data == "" {
-		rest.Error(w, "data required", 400)
+		rest.Error(responseWriter, "data required", 400)
 		return
 	}
 	if payload.SearchData == "" {
-		rest.Error(w, "search data required", 400)
+		rest.Error(responseWriter, "search data required", 400)
 		return
 	}
 
-	//WriteFile(payload.Filename, payload.Data)
-	fileName, result := ParsePayload(payload.Data, payload.SearchData)
+	fileName, result, err := ParsePayload(responseWriter, payload.Data, payload.SearchData)
+	if err != nil {
+		rest.Error(responseWriter, err.Error(), 400)
+		return
+	}
 	returnData := &ReturnData{
 		Filename: fileName,
 		Result:   result}
-	w.WriteJson(returnData)
+	responseWriter.WriteJson(returnData)
 }
 
-func ParsePayload(fileData string, searchDataIn string) (fileNameOut string, result bool) {
+func ParsePayload(responseWriter rest.ResponseWriter, fileData string, searchDataIn string) (fileNameOut string, result bool, err error) {
 
 	decodedData, err := base64.StdEncoding.DecodeString(fileData)
-	CheckError(err)
+	if err != nil {
+		return "", false, err
+	}
 	decodedSearchData, err := base64.StdEncoding.DecodeString(searchDataIn)
-	CheckError(err)
+	if err != nil {
+		return "", false, err
+	}
 	searchData := string(decodedSearchData[:])
 	readerAt := bytes.NewReader(decodedData)
 	dataSize := int64(len(decodedData))
 	zipReader, err := zip.NewReader(readerAt, dataSize)
-	CheckError(err)
+	if err != nil {
+		return "", false, err
+	}
 	for _, f := range zipReader.File {
 		readCloser, err := f.Open()
-		CheckError(err)
+		if err != nil {
+			return "", false, err
+		}
 		fileBytes, err := ioutil.ReadAll(readCloser)
 		fileContents := string(fileBytes[:])
 		if strings.Contains(fileContents, searchData) {
-			return f.Name, true
+			return f.Name, true, nil
 		}
 	}
-	return "", false
-}
-
-func WriteFile(fileName string, fileData string) {
-	decodedData, err := base64.StdEncoding.DecodeString(fileData)
-	CheckError(err)
-	fileHandle, err := os.Create(fileName)
-	CheckError(err)
-	defer fileHandle.Close()
-	if _, err := fileHandle.Write(decodedData); err != nil {
-		log.Fatal(err)
-	}
-	if err := fileHandle.Sync(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func CheckError(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
+	return "", false, nil
 }
